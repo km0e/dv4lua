@@ -1,10 +1,23 @@
 [package]
-name = "rust-bin"
+name = "dv4lua"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 
 [dependencies]
-clap = { version = "4.5.20", features = ["derive"] }
-home = { version = "0.5.9" }
-serde = { version = "1.0.213", features = ["derive"] }
-xcfg-rs = { version = "0.3.0", features = ["full"] }
+clap = { version = "4.5", features = ["derive"] }
+home = { version = "0.5" }
+serde = { version = "1.0", features = ["derive"] }
+
+dv-wrap = { path = "../dv-api/dv-wrap" }
+dv-api = { path = "../dv-api/dv-api", features = ["full"] }
+os2 = { path = "../dv-api/os2", features = ["serde", "rune"] }
+
+tokio = { version = "1.45", features = [
+  "fs",
+  "io-std",
+  "rt-multi-thread",
+  "macros",
+] }
+
+mlua = { version = "0.10", features = ["async", "lua54", "vendored"] }
+thiserror = "2.0"

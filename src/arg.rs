@@ -1,27 +1,30 @@
-use clap::{Parser, Subcommand};
+use clap::Parser;
 use std::path::PathBuf;
 
 fn default_config() -> PathBuf {
     home::home_dir()
         .expect("can't find home directory")
-        .join(".config/rbin/config")
+        .join(".config/dv/")
 }
 
 #[derive(Parser, Debug)]
-#[command(version = "0.1", about = "Simple CLI to show how to use xcfg")]
+#[command(version = env!("CARGO_PKG_VERSION"), about = "Simple CLI to use dv-api with lua")]
 pub struct Cli {
-    #[command(subcommand)]
-    pub command: Which,
+    #[arg(short = 'b', long, help = "Default is $directory/.cache")]
+    pub dbpath: Option<PathBuf>,
+    #[arg(short, long, help = "The config file to use")]
+    pub config: Option<PathBuf>,
     #[arg(short, long, default_value_os_t = default_config())]
-    pub config: PathBuf,
-}
-
-#[derive(Subcommand, Debug)]
-pub enum Which {
-    #[command(visible_alias = "fc", about = "Print full config")]
-    FullConfig { extension: Option<String> },
-    #[command(visible_alias = "n", about = "Print name")]
-    Name,
-    #[command(visible_alias = "a", about = "Print age")]
-    Age,
+    pub directory: PathBuf,
+    #[arg(
+        short = 'n',
+        long,
+        default_value = "false",
+        help = "Do not actually modify anything"
+    )]
+    pub dry_run: bool,
+    #[arg(default_value = "Main", help = "The entry point of the script")]
+    pub entry: String,
+    #[arg(trailing_var_arg = true, help = "Arguments to pass to the entry point")]
+    pub rargs: Vec<String>,
 }
