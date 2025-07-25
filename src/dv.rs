@@ -2,7 +2,7 @@ use std::{collections::HashMap, path::Path};
 
 use dv_api::process::Interactor;
 use dv_wrap::{
-    Context, DeviceInfo, SqliteCache, TermInteractor, User,
+    Context, DeviceInfo, MultiCache, TermInteractor, User,
     ops::{DotConfig, DotUtil, Pm},
 };
 use mlua::Error as LuaError;
@@ -35,7 +35,7 @@ pub struct Dv {
     dry_run: bool,
     devices: HashMap<String, Device>,
     users: HashMap<String, User>,
-    cache: SqliteCache,
+    cache: MultiCache,
     interactor: TermInteractor,
     dotutils: Mutex<DotUtil>,
 }
@@ -125,50 +125,46 @@ impl UserData for Dv {
             },
         );
 
-        methods.add_async_method_mut(
-            "add_user",
-            |_, mut this, (id, obj): (String, Table)| async move {
-                let mut cfg = dv_api::multi::Config::default();
-                for v in obj.pairs::<String, Value>() {
-                    let (name, value) = v?;
-                    if name == "is_system" && value.is_boolean() {
-                        cfg.is_system = value.as_boolean();
-                        continue;
-                    }
-                    let Some(value) = value.as_string() else {
-                        continue;
-                    };
-                    cfg.set(name, value.to_str()?.to_string());
+        fn add_user_prepare(obj: Table) -> mlua::Result<dv_api::multi::Config> {
+            let mut cfg = dv_api::multi::Config::default();
+            for v in obj.pairs::<String, Value>() {
+                let (name, value) = v?;
+                if name == "is_system" && value.is_boolean() {
+                    cfg.is_system = value.as_boolean();
+                    continue;
                 }
+                let Some(value) = value.as_string() else {
+                    continue;
+                };
+                cfg.set(name, value.to_str()?.to_string());
+            }
+            Ok(cfg)
+        }
 
+        methods.add_async_method_mut("add_cur", |_, mut this, obj: Table| async move {
+            let mut cfg = add_user_prepare(obj)?;
+            async {
+                if this.users.contains_key("cur") {
+                    return Err(error::Error::Unknown("user cur already exists".to_string()));
+                }
+                cfg.set("hid", "local");
+                this.add_user("cur".to_string(), User::local(cfg).await?)
+                    .await
+            }
+            .await
+            .map_err(LuaError::external)
+        });
+        methods.add_async_method_mut(
+            "add_ssh",
+            |_, mut this, (uid, obj): (String, Table)| async move {
+                let mut cfg = add_user_prepare(obj)?;
                 async {
-                    let uid = id.clone();
                     if this.users.contains_key(&uid) {
                         return Err(error::Error::Unknown(format!("user {uid} already exists",)));
                     }
-                    let hid = cfg.get("hid").cloned();
-                    let u = User::new(cfg).await?;
-                    if let Some(hid) = hid {
-                        let hid = hid.to_string();
-                        let dev = match this.devices.get_mut(&hid) {
-                            Some(dev) => dev,
-                            None => {
-                                let dev = Device::new(DeviceInfo::detect(&u, u.os()).await?);
-                                this.devices.insert(hid.clone(), dev);
-                                this.devices.get_mut(&hid).unwrap()
-                            }
-                        };
-                        if u.is_system {
-                            dev.system = Some(uid);
-                        } else {
-                            dev.users.push(uid);
-                        }
-                    };
-                    this.interactor
-                        .log(format!("user: {:<10}, os: {:<8}", id.as_str(), u.os()))
-                        .await;
-                    this.users.insert(id, u);
-                    Ok(())
+                    cfg.set("hid", "local");
+                    cfg.set("host", &uid);
+                    this.add_user(uid, User::ssh(cfg).await?).await
                 }
                 .await
                 .map_err(LuaError::external)
@@ -239,21 +235,52 @@ impl UserData for Dv {
                 .map_err(LuaError::external)
             },
         );
+
+        methods.add_method("os", |_, this, uid: String| {
+            let user = this.context().get_user(&uid).map_err(LuaError::external)?;
+            Ok::<_, LuaError>(user.os().to_string())
+        });
     }
 }
 
 impl Dv {
     pub fn new(path: impl AsRef<Path>, dry_run: bool) -> Self {
+        let mut cache = MultiCache::default();
+        cache.add_sqlite(path);
         Self {
             dry_run,
             devices: HashMap::new(),
             users: HashMap::new(),
-            cache: SqliteCache::new(path),
+            cache,
             interactor: TermInteractor::new().unwrap(),
             dotutils: Mutex::new(DotUtil::new(None)),
         }
     }
     pub fn context(&self) -> Context<'_> {
         Context::new(self.dry_run, &self.cache, &self.interactor, &self.users)
+    }
+    async fn add_user(&mut self, uid: String, user: User) -> Result<(), error::Error> {
+        let hid = user.vars.get("hid").cloned();
+        if let Some(hid) = hid {
+            let hid = hid.to_string();
+            let dev = match self.devices.get_mut(&hid) {
+                Some(dev) => dev,
+                None => {
+                    let dev = Device::new(DeviceInfo::detect(&user, user.os()).await?);
+                    self.devices.insert(hid.clone(), dev);
+                    self.devices.get_mut(&hid).unwrap()
+                }
+            };
+            if user.is_system {
+                dev.system = Some(uid.clone());
+            } else {
+                dev.users.push(uid.clone());
+            }
+        };
+        self.interactor
+            .log(format!("user: {:<10}, os: {:<8}", uid.as_str(), user.os()))
+            .await;
+        self.users.insert(uid, user);
+        Ok(())
     }
 }
