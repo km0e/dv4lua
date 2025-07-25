@@ -1,7 +1,7 @@
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
     #[error("dv-wrap error: {0}")]
-    DvWrap(#[from] dv_wrap::error::ErrorChain),
+    DvWrap(#[from] dv_wrap::error::Error),
     #[error("unknown error: {0}")]
     Unknown(String),
 }

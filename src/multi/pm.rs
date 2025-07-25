@@ -8,7 +8,7 @@ pub struct LuaPm(pub Pm);
 
 impl FromLua for LuaPm {
     fn from_lua(lua_value: mlua::Value, _lua: &Lua) -> mlua::Result<Self> {
-        let Some(s) = lua_value.as_str() else {
+        let Some(Ok(s)) = lua_value.as_string().map(|s| s.to_str()) else {
             return Err(mlua::Error::FromLuaConversionError {
                 from: lua_value.type_name(),
                 to: "Pm".to_string(),
@@ -18,7 +18,7 @@ impl FromLua for LuaPm {
         let pm = s.parse().map_err(|_| mlua::Error::FromLuaConversionError {
             from: "String",
             to: "Pm".to_string(),
-            message: Some(format!("invalid package manager: {}", s)),
+            message: Some(format!("invalid package manager: {s}")),
         })?;
         Ok(LuaPm(pm))
     }

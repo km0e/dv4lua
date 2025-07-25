@@ -2,6 +2,7 @@ use clap::Parser;
 
 use dv::Dv;
 use mlua::{Function, Lua};
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 mod error;
 
 mod arg;
@@ -13,6 +14,12 @@ mod util;
 
 #[tokio::main]
 async fn main() -> Result<(), mlua::Error> {
+    tracing_subscriber::Registry::default()
+        .with(tracing_subscriber::EnvFilter::from_default_env())
+        .with(tracing_subscriber::fmt::layer().with_thread_ids(true))
+        // .with(tracing_subscriber::fmt::layer().pretty())
+        .init();
+
     let args = arg::Cli::parse();
 
     let dbpath = args.dbpath.unwrap_or_else(|| args.directory.join(".cache"));
@@ -30,7 +37,18 @@ async fn main() -> Result<(), mlua::Error> {
             .unwrap_or_else(|| args.directory.join("config.lua")),
     )
     .expect("cannot read config file");
-    content.push_str(&format!("\n{}({})\n", args.entry, args.rargs.join(", ")));
+
+    let call = format!(
+        "\n{}({})\n",
+        args.entry,
+        args.rargs
+            .iter()
+            .map(|s| format!("\"{s}\""))
+            .collect::<Vec<_>>()
+            .join(", ")
+    );
+    tracing::info!("Executing entry point: {}", call.trim());
+    content.push_str(&call);
 
     lua.load(content).exec_async().await?;
     Ok(())

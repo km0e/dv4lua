@@ -100,23 +100,6 @@ impl UserData for Dv {
         );
 
         methods.add_async_method(
-            "auto",
-            |_, this, (uid, service, action, args): (String, String, String, Option<String>)| {
-                async move {
-                dv_wrap::ops::auto(
-                            &this.context(),
-                            &uid,
-                            &service,
-                            &action,
-                            args.as_deref(),
-                        )
-                        .await
-                .map_err(LuaError::external)
-                }
-            },
-        );
-
-        methods.add_async_method(
             "once",
             |_, this, (id, key, f): (String, String, Function)| async move {
                 let ret: Result<_, error::Error> = async {
@@ -161,10 +144,7 @@ impl UserData for Dv {
                 async {
                     let uid = id.clone();
                     if this.users.contains_key(&uid) {
-                        return Err(error::Error::Unknown(format!(
-                            "user {} already exists",
-                            uid
-                        )));
+                        return Err(error::Error::Unknown(format!("user {uid} already exists",)));
                     }
                     let hid = cfg.get("hid").cloned();
                     let u = User::new(cfg).await?;
