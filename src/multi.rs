@@ -1,11 +1,17 @@
-mod pm;
-pub use pm::Packages;
+use dv_wrap::Context;
+
+mod dot;
+mod op;
 mod user;
 
-pub fn register(lua: &mlua::Lua, globals: &mlua::Table) -> mlua::Result<()> {
-    let table = lua.create_table()?;
-    user::register(lua, &table)?;
-    pm::register(lua, &table)?;
-    globals.set("user", table)?;
-    Ok(())
+pub fn register(lua: &mlua::Lua, ctx: Context) -> mlua::Result<()> {
+    let ctx = std::sync::Arc::new(tokio::sync::Mutex::new(ctx));
+    let dv = lua.create_table()?;
+    let op = lua.create_userdata(op::Op::new(ctx.clone()))?;
+    dv.set("op", op)?;
+    let dot = lua.create_userdata(dot::Dot::new(ctx.clone()))?;
+    dv.set("dot", dot)?;
+    let um = lua.create_userdata(user::UserManager::new(ctx.clone()))?;
+    dv.set("um", um)?;
+    lua.globals().set("dv", dv)
 }

@@ -10,11 +10,12 @@ fn default_config() -> PathBuf {
 #[derive(Parser, Debug)]
 #[command(version = env!("CARGO_PKG_VERSION"), about = "Simple CLI to use dv-api with lua")]
 pub struct Cli {
-    #[arg(short = 'b', long, help = "Default is $directory/.cache")]
+    #[arg(short = 'b', long, help = "cache database path")]
     pub dbpath: Option<PathBuf>,
     #[arg(short, long, help = "The config file to use")]
     pub config: Option<PathBuf>,
-    #[arg(short, long, default_value_os_t = default_config())]
+    #[arg(short, long, help = "The directory to use for the config and cache",
+        default_value_os_t = default_config())]
     pub directory: PathBuf,
     #[arg(
         short = 'n',
