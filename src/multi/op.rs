@@ -1,7 +1,4 @@
-use dv_wrap::{
-    Context, User,
-    ops::{self, Pm},
-};
+use dv_wrap::{Context, User, ops};
 use mlua::{Error as LuaError, Function, Table, UserData, UserDataMethods, Value};
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -146,25 +143,6 @@ impl UserData for Op {
                     cfg.set("hid", "local");
                     cfg.set("host", &uid);
                     ctx.add_user(uid, User::ssh(cfg).await?).await
-                }
-                .await
-                .map_err(LuaError::external)
-            },
-        );
-
-        methods.add_async_method(
-            "pm",
-            |_, this, (uid, packages): (String, String)| async move {
-                async {
-                    let ctx = this.ctx.lock().await;
-                    let user = ctx.get_user(&uid)?;
-                    let pm = match ctx.devices.get(&uid).map(|dev| dev.info.pm) {
-                        Some(pm) => pm,
-                        None => Pm::detect(user, &user.os()).await?,
-                    };
-
-                    let res = pm.install(&ctx, &uid, &packages).await?;
-                    Ok::<_, dv_wrap::error::Error>(res)
                 }
                 .await
                 .map_err(LuaError::external)

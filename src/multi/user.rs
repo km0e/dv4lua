@@ -51,11 +51,8 @@ impl UserData for UserManager {
                 async {
                     let mut ctx = this.ctx.lock().await;
                     if ctx.contains_user(&uid) {
-                        return Err(dv_wrap::error::Error::unknown(format!(
-                            "user {uid} already exists",
-                        )));
+                        dv_api::whatever!("user {uid} already exists");
                     }
-                    cfg.set("hid", "local");
                     cfg.set("host", &uid);
                     ctx.add_user(uid, User::ssh(cfg).await?).await
                 }
