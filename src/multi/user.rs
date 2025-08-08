@@ -1,13 +1,12 @@
-use dv_wrap::{Context, User};
-use mlua::{Error as LuaError, Table, UserData, UserDataMethods, Value};
-use std::sync::Arc;
-use tokio::sync::Mutex;
+use super::dev::*;
+use dv_wrap::User;
+use mlua::{Table, Value};
 
 pub struct UserManager {
-    ctx: Arc<Mutex<Context>>,
+    ctx: Arc<RwLock<Context>>,
 }
 impl UserManager {
-    pub fn new(ctx: Arc<Mutex<Context>>) -> Self {
+    pub fn new(ctx: Arc<RwLock<Context>>) -> Self {
         Self { ctx }
     }
 }
@@ -32,32 +31,30 @@ impl UserData for UserManager {
 
         methods.add_async_method_mut("add_cur", |_, this, obj: Table| async move {
             let mut cfg = add_user_prepare(obj)?;
-            async {
-                let mut ctx = this.ctx.lock().await;
+            external_error(async {
+                let mut ctx = this.ctx.write().await;
                 if ctx.contains_user("cur") {
-                    return Err(dv_wrap::error::Error::unknown("user cur already exists"));
+                    dv_api::whatever!("user cur already exists");
                 }
                 cfg.set("hid", "local");
                 ctx.add_user("cur".to_string(), User::local(cfg).await?)
                     .await
-            }
+            })
             .await
-            .map_err(LuaError::external)
         });
         methods.add_async_method_mut(
             "add_ssh",
             |_, this, (uid, obj): (String, Table)| async move {
                 let mut cfg = add_user_prepare(obj)?;
-                async {
-                    let mut ctx = this.ctx.lock().await;
+                external_error(async {
+                    let mut ctx = this.ctx.write().await;
                     if ctx.contains_user(&uid) {
                         dv_api::whatever!("user {uid} already exists");
                     }
                     cfg.set("host", &uid);
                     ctx.add_user(uid, User::ssh(cfg).await?).await
-                }
+                })
                 .await
-                .map_err(LuaError::external)
             },
         );
     }

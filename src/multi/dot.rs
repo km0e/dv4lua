@@ -1,32 +1,33 @@
-use dv_wrap::{
-    Context,
-    ops::{DotConfig, DotUtil},
-};
-use mlua::{Error as LuaError, UserData, UserDataMethods};
-use std::sync::Arc;
-use tokio::sync::{Mutex, MutexGuard};
+use super::dev::*;
+use dv_wrap::ops::{DotConfig, DotUtil};
+use tokio::sync;
 
 pub struct Dot {
-    ctx: Arc<Mutex<Context>>,
-    dot: Mutex<DotUtil>,
+    ctx: Arc<RwLock<Context>>,
+    dot: RwLock<DotUtil>,
 }
 impl Dot {
-    pub fn new(ctx: Arc<Mutex<Context>>) -> Self {
+    pub fn new(ctx: Arc<RwLock<Context>>) -> Self {
         Self {
             ctx,
-            dot: Mutex::new(DotUtil::default()),
+            dot: RwLock::new(DotUtil::default()),
         }
     }
-    async fn lock(&self) -> (MutexGuard<Context>, MutexGuard<DotUtil>) {
-        let ctx = self.ctx.lock().await;
-        let dot = self.dot.lock().await;
+    async fn lock(
+        &self,
+    ) -> (
+        sync::RwLockReadGuard<'_, Context>,
+        sync::RwLockWriteGuard<'_, DotUtil>,
+    ) {
+        let ctx = self.ctx.read().await;
+        let dot = self.dot.write().await;
         (ctx, dot)
     }
 }
 impl UserData for Dot {
     fn add_methods<M: UserDataMethods<Self>>(methods: &mut M) {
         methods.add_async_method_mut("confirm", |_, this, confirm: Option<String>| async move {
-            *this.dot.lock().await = DotUtil::new(confirm);
+            *this.dot.write().await = DotUtil::new(confirm);
             Ok(())
         });
 
@@ -34,9 +35,7 @@ impl UserData for Dot {
             "add_schema",
             |_, this, (user, path): (String, String)| async move {
                 let (ctx, mut dot) = this.lock().await;
-                dot.add_schema(&ctx, &user, &path)
-                    .await
-                    .map_err(LuaError::external)
+                external_error(dot.add_schema(&ctx, &user, &path)).await
             },
         );
 
@@ -44,9 +43,7 @@ impl UserData for Dot {
             "add_source",
             |_, this, (user, path): (String, String)| async move {
                 let (ctx, mut dot) = this.lock().await;
-                dot.add_source(&ctx, &user, &path)
-                    .await
-                    .map_err(LuaError::external)
+                external_error(dot.add_source(&ctx, &user, &path)).await
             },
         );
 
@@ -54,9 +51,8 @@ impl UserData for Dot {
             "sync",
             |_, this, (apps, dst): (Vec<String>, String)| async move {
                 let (ctx, dot) = this.lock().await;
-                dot.sync(&ctx, apps.into_iter().map(DotConfig::new).collect(), &dst)
+                external_error(dot.sync(&ctx, apps.into_iter().map(DotConfig::new).collect(), &dst))
                     .await
-                    .map_err(LuaError::external)
             },
         );
     }

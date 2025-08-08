@@ -12,3 +12,12 @@ pub fn conversion_error(
         message: message.map(|m| m.into()),
     }
 }
+pub async fn external_error<F, T>(f: F) -> Result<T, Error>
+where
+    F: std::future::Future<Output = Result<T, dv_wrap::error::Error>>,
+{
+    match f.await {
+        Ok(v) => Ok(v),
+        Err(e) => Err(Error::external(e)),
+    }
+}
