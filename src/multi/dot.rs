@@ -27,7 +27,7 @@ impl Dot {
 impl UserData for Dot {
     fn add_methods<M: UserDataMethods<Self>>(methods: &mut M) {
         methods.add_async_method_mut("confirm", |_, this, confirm: Option<String>| async move {
-            *this.dot.write().await = DotUtil::new(confirm);
+            this.dot.write().await.copy_action = confirm.unwrap_or_default();
             Ok(())
         });
 
@@ -53,6 +53,18 @@ impl UserData for Dot {
                 let (ctx, dot) = this.lock().await;
                 external_error(dot.sync(&ctx, apps.into_iter().map(DotConfig::new).collect(), &dst))
                     .await
+            },
+        );
+        methods.add_async_method(
+            "upload",
+            |_, this, (apps, dst): (Vec<String>, String)| async move {
+                let (ctx, dot) = this.lock().await;
+                external_error(dot.upload(
+                    &ctx,
+                    apps.into_iter().map(DotConfig::new).collect(),
+                    &dst,
+                ))
+                .await
             },
         );
     }

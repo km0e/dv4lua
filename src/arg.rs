@@ -2,7 +2,7 @@ use clap::Parser;
 use std::path::PathBuf;
 
 fn default_config() -> PathBuf {
-    home::home_dir()
+    std::env::home_dir()
         .expect("can't find home directory")
         .join(".config/dv/")
 }

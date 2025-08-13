@@ -18,7 +18,7 @@ impl Op {
 impl UserData for Op {
     fn add_methods<M: UserDataMethods<Self>>(methods: &mut M) {
         methods.add_async_method(
-            "copy",
+            "sync",
             |_,
              this,
              (src, src_path, dst, dst_path, confirm): (
@@ -49,9 +49,9 @@ impl UserData for Op {
                     .collect::<Result<Vec<_>, _>>()?;
                 external_error(async {
                     let ctx = this.ctx.read().await;
-                    let ctx = ops::CopyContext::new(&ctx, &src, &dst, confirm.as_deref())?;
+                    let ctx = ops::SyncContext::new(&ctx, &src, &dst, confirm.as_deref())?;
                     let res = stream::iter(pairs)
-                        .map(|(src_path, dst_path)| ctx.copy(src_path, dst_path))
+                        .map(|(src_path, dst_path)| ctx.sync(src_path, dst_path))
                         .buffered(4)
                         .try_fold(false, |res, copy_res| async move { Ok(res | copy_res) })
                         .await?;
