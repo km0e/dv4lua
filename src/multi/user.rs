@@ -1,12 +1,13 @@
+#![allow(clippy::await_holding_refcell_ref)]
 use super::dev::*;
 use dv_wrap::User;
 use mlua::{Table, Value};
 
 pub struct UserManager {
-    ctx: Arc<RwLock<Context>>,
+    ctx: ContextWrapper,
 }
 impl UserManager {
-    pub fn new(ctx: Arc<RwLock<Context>>) -> Self {
+    pub fn new(ctx: ContextWrapper) -> Self {
         Self { ctx }
     }
 }
@@ -32,7 +33,7 @@ impl UserData for UserManager {
         methods.add_async_method_mut("add_cur", |_, this, obj: Table| async move {
             let mut cfg = add_user_prepare(obj)?;
             external_error(async {
-                let mut ctx = this.ctx.write().await;
+                let mut ctx = this.ctx.ctx_mut();
                 if ctx.contains_user("cur") {
                     dv_api::whatever!("user cur already exists");
                 }
@@ -47,7 +48,7 @@ impl UserData for UserManager {
             |_, this, (uid, obj): (String, Table)| async move {
                 let mut cfg = add_user_prepare(obj)?;
                 external_error(async {
-                    let mut ctx = this.ctx.write().await;
+                    let mut ctx = this.ctx.ctx_mut();
                     if ctx.contains_user(&uid) {
                         dv_api::whatever!("user {uid} already exists");
                     }

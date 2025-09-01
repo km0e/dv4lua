@@ -1,9 +1,9 @@
+#![allow(clippy::await_holding_refcell_ref)]
 use std::collections::HashMap;
 
 use clap::Parser;
 
 use dv_wrap::{Context, MultiCache, TermInteractor};
-use mlua::Lua;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 mod arg;
@@ -31,9 +31,7 @@ async fn main() -> Result<(), mlua::Error> {
         devices: HashMap::new(),
     };
 
-    let lua = Lua::new();
-
-    multi::register(&lua, ctx)?;
+    let ctx = multi::register(ctx)?;
 
     let mut content = std::fs::read_to_string(
         args.config
@@ -53,6 +51,6 @@ async fn main() -> Result<(), mlua::Error> {
     tracing::info!("Executing entry point: {}", call.trim());
     content.push_str(&call);
 
-    lua.load(content).exec_async().await?;
+    ctx.lua().load(content).exec_async().await?;
     Ok(())
 }

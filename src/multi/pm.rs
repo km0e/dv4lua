@@ -1,3 +1,4 @@
+#![allow(clippy::await_holding_refcell_ref)]
 use super::dev::*;
 use dv_wrap::ops::Pm as OpPm;
 use std::ops::Deref;
@@ -5,10 +6,10 @@ use std::ops::Deref;
 use dv_api::whatever;
 
 pub struct Pm {
-    ctx: Arc<RwLock<Context>>,
+    ctx: ContextWrapper,
 }
 impl Pm {
-    pub fn new(ctx: Arc<RwLock<Context>>) -> Self {
+    pub fn new(ctx: ContextWrapper) -> Self {
         Self { ctx }
     }
 }
@@ -43,14 +44,14 @@ impl UserData for Pm {
         methods.add_async_method_mut(
             "install",
             |_, this, (device, packages): (String, String)| async move {
-                with_pm(this.ctx.read().await.deref(), &device, |pm, target, ctx| {
+                with_pm(this.ctx.ctx().deref(), &device, |pm, target, ctx| {
                     pm.install(ctx, target, &packages, true)
                 })
                 .await
             },
         );
         methods.add_async_method_mut("update", |_, this, device: String| async move {
-            with_pm(this.ctx.read().await.deref(), &device, |pm, target, ctx| {
+            with_pm(this.ctx.ctx().deref(), &device, |pm, target, ctx| {
                 pm.update(ctx, target, true)
             })
             .await
@@ -58,7 +59,7 @@ impl UserData for Pm {
         methods.add_async_method_mut(
             "upgrade",
             |_, this, (device, packages): (String, String)| async move {
-                with_pm(this.ctx.read().await.deref(), &device, |pm, target, ctx| {
+                with_pm(this.ctx.ctx().deref(), &device, |pm, target, ctx| {
                     pm.upgrade(ctx, target, &packages, true)
                 })
                 .await

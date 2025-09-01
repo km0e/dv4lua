@@ -21,3 +21,10 @@ This release includes the following improvements and bug fixes:
 - Added support for using network download configuration files protocol.
 - Renamed `op.copy` to `op.sync`.
 - Dotfile management improvements.
+
+# Version 0.1.4 (2025-09-01)
+
+This release includes the following improvements:
+
+- Added support for SSH ProxyJump.
+- Improved Execution of commands.
