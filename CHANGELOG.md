@@ -28,3 +28,9 @@ This release includes the following improvements:
 
 - Added support for SSH ProxyJump.
 - Improved Execution of commands.
+
+# Version 0.1.5 (2025-09-03)
+
+- Fixed a bug in the cache system that caused incorrect behavior when the cache file was missing or corrupted.
+- Migrate single-user API to UM.
+- Add `write` and `read` operations.

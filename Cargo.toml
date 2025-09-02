@@ -1,6 +1,6 @@
 [package]
 name = "dv4lua"
-version = "0.1.4"
+version = "0.1.5"
 edition = "2024"
 description = "a lua-based command line tool that provides abstract user (device) interoperability"
 authors = ["km0e <kmdr.error@gmail.com>"]

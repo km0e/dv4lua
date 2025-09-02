@@ -1,6 +1,4 @@
 #![allow(clippy::await_holding_refcell_ref)]
-use std::collections::HashMap;
-
 use clap::Parser;
 
 use dv_wrap::{Context, MultiCache, TermInteractor};
@@ -23,13 +21,11 @@ async fn main() -> Result<(), mlua::Error> {
 
     let mut cache = MultiCache::default();
     cache.add_sqlite(dbpath);
-    let ctx = Context {
-        dry_run: args.dry_run,
+    let ctx = Context::new(
+        args.dry_run,
         cache,
-        interactor: TermInteractor::new().expect("Failed to create interactor"),
-        users: HashMap::new(),
-        devices: HashMap::new(),
-    };
+        TermInteractor::new().expect("Failed to create interactor"),
+    );
 
     let ctx = multi::register(ctx)?;
 
