@@ -4,12 +4,12 @@ use mlua::Error;
 pub fn conversion_error(
     from: &'static str,
     to: impl Into<String>,
-    message: Option<impl Into<String>>,
+    message: Option<impl ToString>,
 ) -> Error {
     Error::FromLuaConversionError {
         from,
         to: to.into(),
-        message: message.map(|m| m.into()),
+        message: message.map(|m| m.to_string()),
     }
 }
 pub async fn external_error<F, T>(f: F) -> Result<T, Error>

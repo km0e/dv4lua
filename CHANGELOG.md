@@ -34,3 +34,20 @@ This release includes the following improvements:
 - Fixed a bug in the cache system that caused incorrect behavior when the cache file was missing or corrupted.
 - Migrate single-user API to UM.
 - Add `write` and `read` operations.
+
+# Version 0.1.6 (2025-09-05)
+
+## Breaking Changes
+
+- `dot:add_scheme`: Removed `__network__` scheme support. Use `dv:dl` and `dot:add_scheme("cur", ... )` instead.
+- `dv.op`: Removed and replaced with `dv:sync`.
+- `um`, `pm`, `dot`: Get instances via `dv:um()`, `dv:pm()`, and `dv:dot()`.
+
+## Bug Fixes
+
+- `Dot`: `sync` must actually copy files.
+
+## Improvements
+
+- `dv:dl`: Support downloading files from URLs to local paths.
+- `dv:json`: Added `dv:json.encode` and `dv:json.decode` for JSON handling.

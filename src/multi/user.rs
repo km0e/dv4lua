@@ -18,7 +18,7 @@ impl UserWrapper {
     }
 }
 
-#[derive(serde::Deserialize)]
+#[derive(serde::Deserialize, Default)]
 struct ExecOptions {
     reply: bool,
     etor: Option<ScriptExecutor>,
@@ -39,7 +39,8 @@ impl UserData for UserWrapper {
     fn add_methods<M: UserDataMethods<Self>>(methods: &mut M) {
         methods.add_async_method(
             "exec",
-            |_, this, (commands, opt): (String, ExecOptions)| async move {
+            |_, this, (commands, opt): (String, Option<ExecOptions>)| async move {
+                let opt = opt.unwrap_or_default();
                 let ctx = this.ctx.ctx();
                 external_error(ops::exec(&ctx, &this.uid, &commands, opt.reply, opt.etor)).await
             },
@@ -107,30 +108,34 @@ impl UserData for UserManager {
             Ok(cfg)
         }
 
-        methods.add_async_method_mut("add_cur", |_, this, obj: Table| async move {
-            let mut cfg = add_user_prepare(obj)?;
-            external_error(async {
-                let mut ctx = this.ctx_mut();
-                if ctx.contains_user("cur") {
-                    dv_api::whatever!("user cur already exists");
-                }
-                cfg.set("hid", "local");
-                ctx.add_user("cur".to_string(), User::local(cfg).await?)
-                    .await
-            })
-            .await
-        });
+        methods.add_async_method_mut(
+            "add_cur",
+            async move |_, this, obj: Table| -> mlua::Result<bool> {
+                let mut cfg = add_user_prepare(obj)?;
+                external_error(async {
+                    let mut ctx = this.ctx_mut();
+                    if ctx.contains_user("cur") {
+                        return Ok(false);
+                    }
+                    cfg.set("hid", "local");
+                    ctx.add_user("cur".to_string(), User::local(cfg).await?)
+                        .await
+                        .map(|_| true)
+                })
+                .await
+            },
+        );
         methods.add_async_method_mut(
             "add_ssh",
-            |_, this, (uid, obj): (String, Table)| async move {
+            async move |_, this, (uid, obj): (String, Table)| -> mlua::Result<bool> {
                 let mut cfg = add_user_prepare(obj)?;
                 external_error(async {
                     let mut ctx = this.ctx_mut();
                     if ctx.contains_user(&uid) {
-                        dv_api::whatever!("user {uid} already exists");
+                        return Ok(false);
                     }
                     cfg.set("host", &uid);
-                    ctx.add_user(uid, User::ssh(cfg).await?).await
+                    ctx.add_user(uid, User::ssh(cfg).await?).await.map(|_| true)
                 })
                 .await
             },

@@ -18,13 +18,10 @@ impl Dot {
 }
 impl UserData for Dot {
     fn add_methods<M: UserDataMethods<Self>>(methods: &mut M) {
-        methods.add_async_method_mut(
-            "confirm",
-            |_, mut this, confirm: Option<String>| async move {
-                this.dot.get_mut().copy_action = confirm.unwrap_or_default();
-                Ok(())
-            },
-        );
+        methods.add_async_method("confirm", |_, this, confirm: Option<String>| async move {
+            this.dot.borrow_mut().copy_action = confirm.unwrap_or_default();
+            Ok(())
+        });
 
         methods.add_async_method(
             "add_schema",
@@ -38,7 +35,7 @@ impl UserData for Dot {
             },
         );
 
-        methods.add_async_method_mut(
+        methods.add_async_method(
             "add_source",
             |_, this, (user, path): (String, String)| async move {
                 external_error(

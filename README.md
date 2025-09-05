@@ -22,7 +22,9 @@ Dv4lua allows Lua scripts to:
 
 # Usage
 
-See the [the documentation](https://blog.101248.xyz/zh/dv4lua)
+See the [configuration example](https://github.com/km0e/dv4lua/tree/main/config) for script examples.
+
+See the [the documentation](https://blog.101248.xyz/zh/dv4lua) for more details.
 
 # License
 

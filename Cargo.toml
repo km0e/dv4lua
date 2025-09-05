@@ -18,9 +18,11 @@ clap = { version = "4.5", features = ["derive"] }
 dv-wrap = { git = "https://github.com/km0e/dv-api", features = ["full"] }
 dv-api = { git = "https://github.com/km0e/dv-api", features = ["full"] }
 futures = "0.3"
+humantime-serde = { version = "1.1" }
 mlua = { version = "0.11", features = ["async", "serde", "lua54", "vendored"] }
 os2 = { version = "0.1.0", features = ["serde"] }
 serde = { version = "1.0", features = ["derive"] }
+serde_json = { version = "1.0" }
 thiserror = "2.0"
 tokio = { version = "1.47", features = ["rt-multi-thread", "macros"] }
 tracing = { version = "0.1" }
