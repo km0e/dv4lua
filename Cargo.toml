@@ -1,11 +1,11 @@
 [package]
 name = "dv4lua"
-version = "0.1.6"
+version = "0.1.7"
 edition = "2024"
 description = "a lua-based command line tool that provides abstract user (device) interoperability"
 authors = ["km0e <kmdr.error@gmail.com>"]
 repository = "https://github.com/km0e/dv4lua.git"
-homepage = "https://blog.101248.xyz/zh/dv4lua/"
+homepage = "https://blog.101248.xyz/dv4lua/"
 
 [package.metadata.wix]
 upgrade-guid = "EE2C9595-12ED-48A2-BC03-E920E3E35D71"

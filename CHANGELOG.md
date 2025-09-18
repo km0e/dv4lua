@@ -51,3 +51,14 @@ This release includes the following improvements:
 
 - `dv:dl`: Support downloading files from URLs to local paths.
 - `dv:json`: Added `dv:json.encode` and `dv:json.decode` for JSON handling.
+
+# Version 0.1.7 (2025-09-18)
+
+## Bug Fixes
+
+- When `dl` determines the file wasn't changed, it also should update the cache
+- Corrected the overwrite logic in `sync` operation
+
+## Improvements
+
+- Added timeout for `dl` operation

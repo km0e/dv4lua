@@ -173,7 +173,7 @@
         <!--<Icon Id='ProductICO' SourceFile='wix\Product.ico'/>-->
         <!--<Property Id='ARPPRODUCTICON' Value='ProductICO' />-->
 
-        <Property Id='ARPHELPLINK' Value='https://blog.101248.xyz/zh/dv4lua/'/>
+        <Property Id='ARPHELPLINK' Value='https://blog.101248.xyz/dv4lua/'/>
         
         <UI>
             <UIRef Id='WixUI_FeatureTree'/>
