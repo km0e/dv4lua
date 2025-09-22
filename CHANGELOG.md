@@ -62,3 +62,15 @@ This release includes the following improvements:
 ## Improvements
 
 - Added timeout for `dl` operation
+
+# Version 0.1.8 (2025-09-23)
+
+## Improvements
+
+- Better cli interface
+
+- Added `d` (delete) flag to `sync` operation to delete files in the destination that are not present in the source.
+
+## Bug Fixes
+
+- When trying to read file, don't try to create it's parent directories if they don't exist

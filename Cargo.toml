@@ -1,6 +1,6 @@
 [package]
 name = "dv4lua"
-version = "0.1.7"
+version = "0.1.8"
 edition = "2024"
 description = "a lua-based command line tool that provides abstract user (device) interoperability"
 authors = ["km0e <kmdr.error@gmail.com>"]
@@ -14,7 +14,8 @@ license = false
 eula = false
 
 [dependencies]
-clap = { version = "4.5", features = ["derive"] }
+clap = { version = "4.5", features = [] }
+directories = { version = "6.0.0" }
 dv-wrap = { git = "https://github.com/km0e/dv-api", features = ["full"] }
 dv-api = { git = "https://github.com/km0e/dv-api", features = ["full"] }
 futures = "0.3"
