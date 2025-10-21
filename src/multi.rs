@@ -58,7 +58,7 @@ impl ContextWrapper {
     ) -> Result<bool> {
         let opts = sync_opts(confirm.unwrap_or_default())?;
         let ctx = self.ctx();
-        let sync_ctx = ops::SyncContext3::new(&ctx, src.as_ref(), dst.as_ref(), &opts);
+        let sync_ctx = ops::SyncContext::new(&ctx, src.as_ref(), dst.as_ref(), &opts);
         let res = stream::iter(pairs)
             .map(|(src_path, dst_path)| sync_ctx.scan(src_path, dst_path))
             .buffered(4)
@@ -76,7 +76,6 @@ impl ContextWrapper {
         entries: &[SyncEntry],
     ) -> Result<bool> {
         let ctx = self.ctx();
-        let sync_ctx = ops::SyncContext3::new(&ctx, src.as_ref(), dst.as_ref(), &[]);
         for e in entries {
             match e.opt {
                 SyncOpt::OVERWRITE => {
@@ -115,6 +114,7 @@ impl ContextWrapper {
         if self.dry_run {
             return Ok(true);
         }
+        let sync_ctx = ops::SyncContext::new(&ctx, src.as_ref(), dst.as_ref(), &[]);
         sync_ctx.execute(entries).await
     }
     async fn once(
@@ -135,17 +135,20 @@ impl ContextWrapper {
             return Ok(true);
         }
         let res = f.call_async::<bool>(()).await;
-        once.execute().await?;
+        if res.is_ok() {
+            once.execute().await?;
+        }
         res
     }
     async fn refresh(&self, id: impl AsRef<str>, key: impl AsRef<str>) -> Result<()> {
-        let ctx = self.ctx();
-        ctx.interactor
+        self.ctx()
+            .interactor
             .log(format!("Refresh: {}:{}", id.as_ref(), key.as_ref()))
             .await;
         if self.dry_run {
             return Ok(());
         }
+        let ctx = self.ctx();
         ops::refresh(&ctx, id.as_ref(), key.as_ref()).await
     }
 

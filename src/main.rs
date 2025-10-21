@@ -9,6 +9,21 @@ mod arg;
 mod multi;
 mod util;
 
+fn lua_string_escape(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for ch in s.chars() {
+        match ch {
+            '\\' => out.push_str("\\\\"),
+            '"' => out.push_str("\\\""),
+            '\n' => out.push_str("\\n"),
+            '\r' => out.push_str("\\r"),
+            '\t' => out.push_str("\\t"),
+            _ => out.push(ch),
+        }
+    }
+    out
+}
+
 #[tokio::main]
 async fn main() -> Result<(), mlua::Error> {
     tracing_subscriber::Registry::default()
@@ -28,23 +43,23 @@ async fn main() -> Result<(), mlua::Error> {
     tracing::debug!(?config, ?cache_dir, ?dry_run, ?entry, ?dbpath, ?rargs);
 
     let mut cache = MultiDB::default();
-    cache.add_sqlite(dbpath);
-    let ctx = Context::new(
-        cache,
-        cache_dir,
-        TermInteractor::new().expect("Failed to create interactor"),
-    );
+    cache.add_sqlite(dbpath).map_err(mlua::Error::external)?;
+    let interactor = TermInteractor::new().map_err(mlua::Error::external)?;
+    let ctx = Context::new(cache, cache_dir, interactor);
 
-    let ctx = multi::register(ctx, dry_run).expect("Failed to register multi operations");
+    let ctx = multi::register(ctx, dry_run)?;
 
-    let mut content = std::fs::read_to_string(config).expect("cannot read config file");
+    let mut content = std::fs::read_to_string(&config).unwrap_or_else(|_| {
+        tracing::error!("Failed to read config file: {}", config.display());
+        std::process::exit(1);
+    });
 
     let call = format!(
         "\n{}({})\n",
         entry,
         rargs
             .iter()
-            .map(|s| format!("\"{s}\""))
+            .map(|s| format!("\"{}\"", lua_string_escape(s)))
             .collect::<Vec<_>>()
             .join(", ")
     );

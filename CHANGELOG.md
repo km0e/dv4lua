@@ -1,39 +1,50 @@
-# Version 0.1.0 (2025-07-27)
+# Version 0.1.10 (2026-04-14)
 
-This is the first alpha release of the project. It includes the following features:
+## Improvements
 
-- Synchronization of files between local and remote directories.
-- Execution of commands on local and remote machines.
-- Package management for installing packages.
-- Basic dotfile management for managing dotfiles.
+- Escaped CLI entry arguments before injecting them into Lua invocation to avoid malformed scripts when arguments contain special characters.
+- Improved startup error handling in `main`: avoid panic paths and return/report structured errors for context creation and operation registration.
+- Tightened `sync` confirm option parsing to reject invalid digits and map only supported option bits.
+- Updated release toolchain/config:
+	- `cargo-dist` bumped to `0.31.0`
+	- GitHub Actions updated to newer `actions/checkout` and artifact actions
+	- Expanded dist targets to include macOS and aarch64 Windows
+	- Rust toolchain channel switched to `stable`
 
-# Version 0.1.1 (2025-08-06)
+## Bug Fixes
 
-This release includes the following improvements and bug fixes:
+- In `multi::once`, execute pending sync entries only when the callback succeeds.
+- In refresh flow, avoid unnecessary context retention before dry-run checks.
 
-- Inserted detected os into the config.
-- Better package management.
+# Version 0.1.9 (2025-10-21)
 
-# Version 0.1.3 (2025-08-11)
+## Improvements
 
-This release includes the following improvements and bug fixes:
+- Better action confirmation for `sync` operation
 
-- Added support for using network download configuration files protocol.
-- Renamed `op.copy` to `op.sync`.
-- Dotfile management improvements.
 
-# Version 0.1.4 (2025-09-01)
+# Version 0.1.8 (2025-09-23)
 
-This release includes the following improvements:
+## Improvements
 
-- Added support for SSH ProxyJump.
-- Improved Execution of commands.
+- Better cli interface
 
-# Version 0.1.5 (2025-09-03)
+- Added `d` (delete) flag to `sync` operation to delete files in the destination that are not present in the source.
 
-- Fixed a bug in the cache system that caused incorrect behavior when the cache file was missing or corrupted.
-- Migrate single-user API to UM.
-- Add `write` and `read` operations.
+## Bug Fixes
+
+- When trying to read file, don't try to create it's parent directories if they don't exist
+
+# Version 0.1.7 (2025-09-18)
+
+## Bug Fixes
+
+- When `dl` determines the file wasn't changed, it also should update the cache
+- Corrected the overwrite logic in `sync` operation
+
+## Improvements
+
+- Added timeout for `dl` operation
 
 # Version 0.1.6 (2025-09-05)
 
@@ -52,31 +63,40 @@ This release includes the following improvements:
 - `dv:dl`: Support downloading files from URLs to local paths.
 - `dv:json`: Added `dv:json.encode` and `dv:json.decode` for JSON handling.
 
-# Version 0.1.7 (2025-09-18)
+# Version 0.1.5 (2025-09-03)
 
-## Bug Fixes
+- Fixed a bug in the cache system that caused incorrect behavior when the cache file was missing or corrupted.
+- Migrate single-user API to UM.
+- Add `write` and `read` operations.
 
-- When `dl` determines the file wasn't changed, it also should update the cache
-- Corrected the overwrite logic in `sync` operation
+# Version 0.1.4 (2025-09-01)
 
-## Improvements
+This release includes the following improvements:
 
-- Added timeout for `dl` operation
+- Added support for SSH ProxyJump.
+- Improved Execution of commands.
 
-# Version 0.1.8 (2025-09-23)
+# Version 0.1.3 (2025-08-11)
 
-## Improvements
+This release includes the following improvements and bug fixes:
 
-- Better cli interface
+- Added support for using network download configuration files protocol.
+- Renamed `op.copy` to `op.sync`.
+- Dotfile management improvements.
 
-- Added `d` (delete) flag to `sync` operation to delete files in the destination that are not present in the source.
+# Version 0.1.1 (2025-08-06)
 
-## Bug Fixes
+This release includes the following improvements and bug fixes:
 
-- When trying to read file, don't try to create it's parent directories if they don't exist
+- Inserted detected os into the config.
+- Better package management.
 
-# Version 0.1.9 (2025-10-21)
+# Version 0.1.0 (2025-07-27)
 
-## Improvements
+This is the first alpha release of the project. It includes the following features:
 
-- Better action confirmation for `sync` operation
+- Synchronization of files between local and remote directories.
+- Execution of commands on local and remote machines.
+- Package management for installing packages.
+- Basic dotfile management for managing dotfiles.
+

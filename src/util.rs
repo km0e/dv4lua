@@ -5,10 +5,13 @@ use mlua::Error;
 pub fn sync_opts(s: &str) -> dv_wrap::Result<Vec<SyncOpt>> {
     let mut opts = Vec::new();
     for c in s.chars() {
-        if !c.is_ascii_digit() {
+        if !c.is_ascii_digit() || c == '0' {
             bail!("Invalid confirm option: {}", c);
         }
-        opts.push(SyncOpt::from_bits_retain((1 << (c as u8 - b'0')) >> 1));
+        let bit = 1u8 << (c as u8 - b'1');
+        let opt = SyncOpt::from_bits(bit)
+            .ok_or_else(|| anyhow::anyhow!("Invalid confirm option: {}", c))?;
+        opts.push(opt);
     }
     Ok(opts)
 }
