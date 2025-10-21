@@ -49,7 +49,6 @@ pub fn cli() -> Args {
             .arg(
                 Arg::new("rargs")
                     .num_args(0..)
-                    .trailing_var_arg(true)
                     .help("Arguments to pass to the entry point"),
             )
             .get_matches();

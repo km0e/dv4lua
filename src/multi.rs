@@ -1,11 +1,19 @@
-use dv_wrap::ops;
+mod dev {
+    pub use super::ContextWrapper;
+    pub use anyhow::Result;
+    pub use mlua::{UserData, UserDataMethods};
+}
+use anyhow::bail;
+use dev::*;
+
+use dv_wrap::ops::{self, SyncEntry, SyncOpt};
 use futures::{StreamExt, TryStreamExt, stream};
 use std::{cell::RefCell, rc::Rc, time::Duration};
 
 use dv_wrap::Context;
-use mlua::{FromLua, Function, Lua, LuaSerdeExt, UserData, UserDataMethods, Value};
+use mlua::{FromLua, Function, Lua, LuaSerdeExt, Value};
 
-use crate::util::{conversion_error, external_error};
+use crate::util::{conversion_error, sync_opts};
 
 mod dot;
 mod pm;
@@ -15,13 +23,21 @@ mod user;
 pub struct ContextWrapper {
     ctx: Rc<RefCell<Context>>,
     lua: Rc<RefCell<Lua>>,
+    dry_run: bool,
+}
+
+impl dv_wrap::AsRefContext for ContextWrapper {
+    fn as_ref(&self) -> impl std::ops::Deref<Target = Context> + '_ {
+        self.ctx()
+    }
 }
 
 impl ContextWrapper {
-    fn new(ctx: Context) -> Self {
+    fn new(ctx: dv_wrap::Context, dry_run: bool) -> Self {
         Self {
             ctx: Rc::new(RefCell::new(ctx)),
             lua: Rc::new(RefCell::new(Lua::new())),
+            dry_run,
         }
     }
     fn ctx(&self) -> std::cell::Ref<'_, Context> {
@@ -39,15 +55,67 @@ impl ContextWrapper {
         dst: impl AsRef<str>,
         pairs: &[(String, String)],
         confirm: Option<&str>,
-    ) -> Result<bool, dv_wrap::error::Error> {
+    ) -> Result<bool> {
+        let opts = sync_opts(confirm.unwrap_or_default())?;
         let ctx = self.ctx();
-        let sync_ctx = ops::SyncContext::new(&ctx, src.as_ref(), dst.as_ref(), confirm)?;
+        let sync_ctx = ops::SyncContext3::new(&ctx, src.as_ref(), dst.as_ref(), &opts);
         let res = stream::iter(pairs)
-            .map(|(src_path, dst_path)| sync_ctx.sync(src_path, dst_path))
+            .map(|(src_path, dst_path)| sync_ctx.scan(src_path, dst_path))
             .buffered(4)
-            .try_fold(false, |res, copy_res| async move { Ok(res | copy_res) })
+            .try_fold(Vec::new(), |mut res, copy_res| async move {
+                res.extend(copy_res);
+                Ok(res)
+            })
             .await?;
-        Ok(res)
+        self.sync_impl(src, dst, &res).await
+    }
+    async fn sync_impl(
+        &self,
+        src: impl AsRef<str>,
+        dst: impl AsRef<str>,
+        entries: &[SyncEntry],
+    ) -> Result<bool> {
+        let ctx = self.ctx();
+        let sync_ctx = ops::SyncContext3::new(&ctx, src.as_ref(), dst.as_ref(), &[]);
+        for e in entries {
+            match e.opt {
+                SyncOpt::OVERWRITE => {
+                    ctx.interactor
+                        .log(format!("Overwrite: {} -> {}", e.src, e.dst))
+                        .await;
+                }
+                SyncOpt::UPDATE => {
+                    ctx.interactor
+                        .log(format!("Update: {} -> {}", e.src, e.dst))
+                        .await;
+                }
+                SyncOpt::UPLOAD => {
+                    ctx.interactor
+                        .log(format!("Upload: {} -> {}", e.src, e.dst))
+                        .await;
+                }
+                SyncOpt::DOWNLOAD => {
+                    ctx.interactor
+                        .log(format!("Download: {} -> {}", e.src, e.dst))
+                        .await;
+                }
+                SyncOpt::DELETESRC => {
+                    ctx.interactor.log(format!("Delete local: {}", e.src)).await;
+                }
+                SyncOpt::DELETEDST => {
+                    ctx.interactor
+                        .log(format!("Delete remote: {}", e.src))
+                        .await;
+                }
+                _ => {
+                    bail!("Unknown operation for sync: {:?}", e.opt);
+                }
+            }
+        }
+        if self.dry_run {
+            return Ok(true);
+        }
+        sync_ctx.execute(entries).await
     }
     async fn once(
         &self,
@@ -55,29 +123,51 @@ impl ContextWrapper {
         key: impl AsRef<str>,
         f: Function,
     ) -> Result<bool, mlua::Error> {
-        let ctx = self.ctx();
-        let once = ops::Once::new(&ctx, id.as_ref(), key.as_ref());
-        if !external_error(once.test()).await? {
+        let once = ops::Once::new(self.clone(), id.as_ref(), key.as_ref());
+        if !once.test().await? {
             return Ok(false);
         }
+        self.ctx()
+            .interactor
+            .log(format!("Once executing: {}:{}", id.as_ref(), key.as_ref()))
+            .await;
+        if self.dry_run {
+            return Ok(true);
+        }
         let res = f.call_async::<bool>(()).await;
-        external_error(once.set()).await?;
+        once.execute().await?;
         res
     }
-    async fn refresh(
-        &self,
-        id: impl AsRef<str>,
-        key: impl AsRef<str>,
-    ) -> Result<(), dv_wrap::error::Error> {
-        ops::refresh(&self.ctx(), id.as_ref(), key.as_ref()).await
+    async fn refresh(&self, id: impl AsRef<str>, key: impl AsRef<str>) -> Result<()> {
+        let ctx = self.ctx();
+        ctx.interactor
+            .log(format!("Refresh: {}:{}", id.as_ref(), key.as_ref()))
+            .await;
+        if self.dry_run {
+            return Ok(());
+        }
+        ops::refresh(&ctx, id.as_ref(), key.as_ref()).await
     }
 
-    async fn dl(&self, url: impl AsRef<str>, expire: Option<Value>) -> Result<String, mlua::Error> {
-        let expire: Option<humantime_serde::Serde<Duration>> = expire
-            .map(|expire| self.lua().from_value(expire))
-            .transpose()?;
+    async fn dl(
+        &self,
+        url: impl AsRef<str>,
+        expire: Option<humantime_serde::Serde<Duration>>,
+    ) -> Result<String, mlua::Error> {
         let expire = expire.map(|e| e.as_secs());
-        external_error(ops::dl(&self.ctx(), url.as_ref(), expire)).await
+        let (path, dl) = ops::Dl::new(self.clone(), url.as_ref(), expire).await?;
+        let Some(dl) = dl else {
+            return Ok(path);
+        };
+        self.ctx()
+            .interactor
+            .log(format!("Download: {} -> {}", url.as_ref(), path))
+            .await;
+        if self.dry_run {
+            return Ok(path);
+        }
+        dl.execute(&path).await?;
+        Ok(path)
     }
 }
 
@@ -121,7 +211,7 @@ impl UserData for ContextWrapper {
                         Some("Single dst_path required"),
                     ))?,
                 };
-                external_error(this.sync(&src, &dst, &pairs, confirm.as_deref())).await
+                Ok(this.sync(&src, &dst, &pairs, confirm.as_deref()).await?)
             },
         );
 
@@ -134,14 +224,20 @@ impl UserData for ContextWrapper {
 
         methods.add_async_method(
             "refresh",
-            |_, this, (id, key): (String, String)| async move {
-                external_error(this.refresh(id, key)).await
-            },
+            |_, this, (id, key): (String, String)| async move { Ok(this.refresh(id, key).await?) },
         );
 
         methods.add_async_method(
             "dl",
-            |_, this, (url, expire): (String, Option<Value>)| async move { this.dl(url, expire).await },
+            |_, this, (url, expire): (String, Option<Value>)| async move {
+                this.dl(
+                    url,
+                    expire
+                        .map(|expire| this.lua().from_value(expire))
+                        .transpose()?,
+                )
+                .await
+            },
         );
 
         methods.add_async_method("json", |_, this, (value,): (Value,)| async move {
@@ -164,16 +260,10 @@ impl UserData for ContextWrapper {
     }
 }
 
-pub fn register(ctx: dv_wrap::Context) -> mlua::Result<ContextWrapper> {
-    let ctx = ContextWrapper::new(ctx);
+pub fn register(ctx: dv_wrap::Context, dry_run: bool) -> mlua::Result<ContextWrapper> {
+    let ctx = ContextWrapper::new(ctx, dry_run);
     ctx.lua().globals().set("dv", ctx.clone())?;
     Ok(ctx)
-}
-
-mod dev {
-    pub use super::ContextWrapper;
-    pub use crate::util::external_error;
-    pub use mlua::{UserData, UserDataMethods};
 }
 
 #[cfg(test)]

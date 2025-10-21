@@ -1,5 +1,3 @@
-#![allow(clippy::await_holding_refcell_ref)]
-
 use super::dev::*;
 use dv_api::process::ScriptExecutor;
 use dv_wrap::User;
@@ -42,19 +40,46 @@ impl UserData for UserWrapper {
             |_, this, (commands, opt): (String, Option<ExecOptions>)| async move {
                 let opt = opt.unwrap_or_default();
                 let ctx = this.ctx.ctx();
-                external_error(ops::exec(&ctx, &this.uid, &commands, opt.reply, opt.etor)).await
+                ctx.interactor
+                    .log(format!(
+                        "Exec on {}: {} (reply: {}, etor: {:?})",
+                        this.uid, commands, opt.reply, opt.etor
+                    ))
+                    .await;
+                if this.ctx.dry_run {
+                    return Ok((
+                        0,
+                        this.ctx.lua().create_string("")?,
+                        this.ctx.lua().create_string("")?,
+                    ));
+                }
+                let output = ops::exec(&ctx, &this.uid, &commands, opt.reply, opt.etor).await?;
+                Ok((
+                    output.code,
+                    this.ctx.lua().create_string(output.stdout)?,
+                    this.ctx.lua().create_string(output.stderr)?,
+                ))
             },
         );
         methods.add_async_method(
             "write",
             |_, this, (path, content): (String, String)| async move {
                 let ctx = this.ctx.ctx();
-                external_error(ops::write(&ctx, &this.uid, &path, &content)).await
+                ctx.interactor
+                    .log(format!("Write on {}: {}", this.uid, path))
+                    .await;
+                if this.ctx.dry_run {
+                    return Ok(true);
+                }
+                Ok(ops::write(&ctx, &this.uid, &path, &content).await?)
             },
         );
         methods.add_async_method("read", |_, this, path: String| async move {
             let ctx = this.ctx.ctx();
-            external_error(ops::read(&ctx, &this.uid, &path)).await
+            ctx.interactor
+                .log(format!("Read on {}: {}", this.uid, path))
+                .await;
+            Ok(ops::read(&ctx, &this.uid, &path).await?)
         });
         methods.add_meta_method(mlua::MetaMethod::Index, |_, this, key: String| {
             let ctx = this.ctx.ctx();
@@ -112,32 +137,30 @@ impl UserData for UserManager {
             "add_cur",
             async move |_, this, obj: Table| -> mlua::Result<bool> {
                 let mut cfg = add_user_prepare(obj)?;
-                external_error(async {
-                    let mut ctx = this.ctx_mut();
-                    if ctx.contains_user("cur") {
-                        return Ok(false);
-                    }
-                    cfg.set("hid", "local");
-                    ctx.add_user("cur".to_string(), User::local(cfg).await?)
-                        .await
-                        .map(|_| true)
-                })
-                .await
+                let mut ctx = this.ctx_mut();
+                if ctx.contains_user("cur") {
+                    return Ok(false);
+                }
+                cfg.set("hid", "local");
+                Ok(ctx
+                    .add_user("cur".to_string(), User::local(cfg).await?)
+                    .await
+                    .map(|_| true)?)
             },
         );
         methods.add_async_method_mut(
             "add_ssh",
             async move |_, this, (uid, obj): (String, Table)| -> mlua::Result<bool> {
                 let mut cfg = add_user_prepare(obj)?;
-                external_error(async {
-                    let mut ctx = this.ctx_mut();
-                    if ctx.contains_user(&uid) {
-                        return Ok(false);
-                    }
-                    cfg.set("host", &uid);
-                    ctx.add_user(uid, User::ssh(cfg).await?).await.map(|_| true)
-                })
-                .await
+                let mut ctx = this.ctx_mut();
+                if ctx.contains_user(&uid) {
+                    return Ok(false);
+                }
+                cfg.set("host", &uid);
+                Ok(ctx
+                    .add_user(uid, User::ssh(cfg).await?)
+                    .await
+                    .map(|_| true)?)
             },
         );
 

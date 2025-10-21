@@ -30,13 +30,12 @@ async fn main() -> Result<(), mlua::Error> {
     let mut cache = MultiDB::default();
     cache.add_sqlite(dbpath);
     let ctx = Context::new(
-        dry_run,
         cache,
         cache_dir,
         TermInteractor::new().expect("Failed to create interactor"),
     );
 
-    let ctx = multi::register(ctx)?;
+    let ctx = multi::register(ctx, dry_run).expect("Failed to register multi operations");
 
     let mut content = std::fs::read_to_string(config).expect("cannot read config file");
 

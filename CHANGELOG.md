@@ -74,3 +74,9 @@ This release includes the following improvements:
 ## Bug Fixes
 
 - When trying to read file, don't try to create it's parent directories if they don't exist
+
+# Version 0.1.9 (2025-10-21)
+
+## Improvements
+
+- Better action confirmation for `sync` operation

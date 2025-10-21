@@ -1,9 +1,7 @@
-#![allow(clippy::await_holding_refcell_ref)]
 use super::dev::*;
+use anyhow::bail;
 use dv_wrap::ops::Pm as OpPm;
 use std::ops::Deref;
-
-use dv_api::whatever;
 
 pub struct Pm {
     ctx: ContextWrapper,
@@ -21,22 +19,21 @@ async fn with_pm<'a: 'b, 'b, F, Fut, R>(
 ) -> Result<R, mlua::Error>
 where
     F: FnOnce(&'a OpPm, &'a str, &'a dv_wrap::Context) -> Fut,
-    Fut: std::future::Future<Output = Result<R, dv_wrap::error::Error>> + 'b,
+    Fut: std::future::Future<Output = Result<R>> + 'b,
 {
-    external_error(async {
+    Ok(async {
         let Some(dev) = ctx.devices.get(device) else {
-            whatever!("Device {device} not found in context")
+            bail!("Device {device} not found in context")
         };
-
         if let Some(sys) = &dev.system {
             f(&dev.info.pm, sys, ctx).await
         } else if let Some(user) = dev.users.first() {
             f(&dev.info.pm, user, ctx).await
         } else {
-            whatever!("Device {device} has no system or user defined")
+            bail!("Device {device} has no system or users")
         }
-    })
-    .await
+    }
+    .await?)
 }
 
 impl UserData for Pm {
@@ -44,14 +41,26 @@ impl UserData for Pm {
         methods.add_async_method_mut(
             "install",
             |_, this, (device, packages): (String, String)| async move {
-                with_pm(this.ctx.ctx().deref(), &device, |pm, target, ctx| {
+                let ctx = this.ctx.ctx();
+                ctx.interactor
+                    .log(format!("Install on {}: {}", device, packages))
+                    .await;
+                if this.ctx.dry_run {
+                    return Ok(true);
+                }
+                with_pm(ctx.deref(), &device, |pm, target, ctx| {
                     pm.install(ctx, target, &packages, true)
                 })
                 .await
             },
         );
         methods.add_async_method_mut("update", |_, this, device: String| async move {
-            with_pm(this.ctx.ctx().deref(), &device, |pm, target, ctx| {
+            let ctx = this.ctx.ctx();
+            ctx.interactor.log(format!("Update on {}", device)).await;
+            if this.ctx.dry_run {
+                return Ok(true);
+            }
+            with_pm(ctx.deref(), &device, |pm, target, ctx| {
                 pm.update(ctx, target, true)
             })
             .await
@@ -59,6 +68,13 @@ impl UserData for Pm {
         methods.add_async_method_mut(
             "upgrade",
             |_, this, (device, packages): (String, String)| async move {
+                let ctx = this.ctx.ctx();
+                ctx.interactor
+                    .log(format!("Upgrade on {}: {}", device, packages))
+                    .await;
+                if this.ctx.dry_run {
+                    return Ok(true);
+                }
                 with_pm(this.ctx.ctx().deref(), &device, |pm, target, ctx| {
                     pm.upgrade(ctx, target, &packages, true)
                 })
